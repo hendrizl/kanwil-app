@@ -1,4 +1,4 @@
-import logo from "../assets/logo_pas.png";
+import logo from "../assets/logo_pas_outline.png";
 
 export default function Header() {
   return (
