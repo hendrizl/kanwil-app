@@ -37,8 +37,6 @@ body {
     width: 55px;
     height: 55px;
     object-fit: contain;
-    background: #fff;
-    border-radius: 12px;
     padding: 4px;
 }
 
