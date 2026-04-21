@@ -4,7 +4,8 @@ export default function SearchableDropdown({
   options = [],
   value,
   onChange,
-  placeholder = "Pilih...",
+  placeholder = "Pilih…",
+  disabled = false,
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -12,31 +13,24 @@ export default function SearchableDropdown({
 
   const selectedOption = options.find((opt) => opt.value === value);
 
-  // filter
   const filteredOptions = options.filter((opt) =>
     opt.label.toLowerCase().includes(query.toLowerCase())
   );
 
-  // klik luar -> close
   useEffect(() => {
     function handleClickOutside(e) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
         setOpen(false);
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // sync value ke input
   useEffect(() => {
-    if (selectedOption) {
-      setQuery(selectedOption.label);
-    } else {
-      setQuery("");
-    }
-  }, [value]);
+    if (selectedOption) setQuery(selectedOption.label);
+    else setQuery("");
+  }, [value, selectedOption]);
 
   const handleSelect = (option) => {
     onChange(option.value);
@@ -57,15 +51,14 @@ export default function SearchableDropdown({
           className="searchable-dropdown-input"
           value={query}
           placeholder={placeholder}
+          disabled={disabled}
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => { if (!disabled) setOpen(true); }}
         />
-
-        {/* tombol clear */}
-        {query && (
+        {query && !disabled && (
           <button
             type="button"
             className="searchable-dropdown-clear"
@@ -76,25 +69,21 @@ export default function SearchableDropdown({
         )}
       </div>
 
-      {open && (
+      {open && !disabled && (
         <div className="searchable-dropdown-panel">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((opt) => (
               <button
                 type="button"
                 key={opt.value}
-                className={`searchable-dropdown-item ${
-                  opt.value === value ? "selected" : ""
-                }`}
+                className={`searchable-dropdown-item ${opt.value === value ? "selected" : ""}`}
                 onClick={() => handleSelect(opt)}
               >
                 {opt.label}
               </button>
             ))
           ) : (
-            <div className="searchable-dropdown-empty">
-              Tidak ditemukan
-            </div>
+            <div className="searchable-dropdown-empty">Tidak ditemukan</div>
           )}
         </div>
       )}

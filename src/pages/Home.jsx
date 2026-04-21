@@ -1,289 +1,603 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "react-toastify";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass
+import {
+  faMagnifyingGlass,
+  faPlus,
+  faTrash,
+  faPaperPlane,
+  faRotateLeft,
+  faCircleCheck,
+  faUser,
+  faSpinner,
+  faDownload,
+  faXmark,
+  faFileLines,
 } from "@fortawesome/free-solid-svg-icons";
 import SearchableDropdown from "../components/SearchableDropdown";
+import { getNamaByNIP, isNamaNotFound, getLists, getIndeksByKode, isIndeksNotFound, submitPermohonan } from "../services/api";
+import { generatePermohonanPdf, triggerDownload } from "../utils/generatePdf";
 
+
+
+let sectionCounter = 1;
+function createSection() {
+  sectionCounter++;
+  return {
+    id: sectionCounter,
+    bidang: "",
+    kodeSurat: "",
+    indeksKode: "",
+    tanggalPermintaan: "",
+    tanggalSurat: "",
+    isiSurat: "",
+    pengirim: "",
+    tujuan: "",
+    jumlah: 1,
+  };
+}
+
+function ConfirmModal({ onConfirm, onCancel, sections }) {
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal-box confirm-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="confirm-icon-wrapper">
+          <div className="confirm-icon-circle">
+            <FontAwesomeIcon icon={faFileLines} />
+          </div>
+        </div>
+        <div className="modal-title">Konfirmasi Permohonan</div>
+        <div className="modal-body">
+          <div className="confirm-summary-list">
+            {sections.map((s, i) => (
+              <div key={s.id} className="confirm-summary-item">
+                {sections.length > 1 && <div className="confirm-summary-badge">{i + 1}</div>}
+                <div className="confirm-summary-text" style={{ fontSize: "13px", lineHeight: "1.6", color: "#1e293b", textAlign: "center" }}>
+                  <strong>Anda Mengajukan Permohonan {s.jumlah} Nomor Surat {s.indeksKode || "(Indeks belum dipilih)"}</strong>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="modal-body-note">
+            Pastikan semua data yang diisi sudah benar sebelum permohonan dikirim
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="modal-btn-cancel" onClick={onCancel}>
+            Batal
+          </button>
+          <button className="modal-btn-confirm" onClick={onConfirm}>
+            <FontAwesomeIcon icon={faPaperPlane} />
+            &nbsp;Ya, Kirim
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── LOADING MODAL ── */
+function LoadingModal({ message }) {
+  return (
+    <div className="modal-overlay" style={{ pointerEvents: "none" }}>
+      <div className="modal-box loading-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="loading-spinner-wrapper">
+          <div className="loading-spinner"></div>
+        </div>
+        <div className="loading-modal-title">Memproses Permohonan</div>
+        <div className="loading-modal-message">{message}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── SUCCESS MODAL ── */
+function SuccessModal({ pdfResults, onClose }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box success-modal-box" onClick={(e) => e.stopPropagation()}>
+        <button className="success-modal-close" onClick={onClose}>
+          <FontAwesomeIcon icon={faXmark} />
+        </button>
+        <div className="success-icon-wrapper">
+          <div className="success-icon-circle">
+            <FontAwesomeIcon icon={faCircleCheck} />
+          </div>
+        </div>
+        <div className="success-modal-title">Permohonan Berhasil</div>
+        <div className="success-modal-subtitle">
+          Data telah tersimpan dan Hasil permohonan akan diunduh secara otomatis.
+          Jika unduhan otomatis tidak bekerja, gunakan tombol di bawah ini.
+        </div>
+        <div className="success-pdf-list">
+          {pdfResults.map((pdf, i) => (
+            <a
+              key={i}
+              className="success-download-btn"
+              href={pdf.url}
+              download={pdf.filename}
+            >
+              <FontAwesomeIcon icon={faDownload} />
+              <span className="success-download-filename">{pdf.filename}</span>
+            </a>
+          ))}
+        </div>
+        <div className="success-modal-actions">
+          <button className="modal-btn-confirm" onClick={onClose}>
+            Selesai
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const [nip, setNip] = useState("");
   const [nama, setNama] = useState("");
-  const [bidang, setBidang] = useState("");
-  const [kodeSurat, setKodeSurat] = useState("");
-  const [indeksKode, setIndeksKode] = useState("");
-  const [ambilLebihDariSatu, setAmbilLebihDariSatu] = useState(false);
-  const [jumlahNomorSurat, setJumlahNomorSurat] = useState(1);
+  const [sections, setSections] = useState([
+    {
+      id: 1,
+      bidang: "",
+      kodeSurat: "",
+      indeksKode: "",
+      tanggalPermintaan: "",
+      tanggalSurat: "",
+      isiSurat: "",
+      pengirim: "",
+      tujuan: "",
+      jumlah: 1,
+    },
+  ]);
+  const [showModal, setShowModal] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const userData = {
-    "199910082025061015": "Hendrizal",
-    "123": "Siti Aminah",
-    "1122334455": "Agus Priyanto",
-  };
+  /* ── Submit flow states ── */
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
+  const [pdfResults, setPdfResults] = useState([]); // [{ url, filename }]
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  const bidangOptions = [
-    { value: "Bidang Perawatan, Pengamanan dan Kepatuhan Internal", label: "Bidang Perawatan, Pengamanan dan Kepatuhan Internal" },
-    { value: "Bidang Pembimbingan Kemasyarakatan", label: "Bidang Pembimbingan Kemasyarakatan" },
-    { value: "Bidang Tata Usaha dan Umum", label: "Bidang Tata Usaha dan Umum" },
-    { value: "Bidang Pelayanan dan Pembinaan", label: "Bidang Pelayanan dan Pembinaan" },
-  ];
+  /* ── Dynamic data from API ── */
+  const [bidangOptions, setBidangOptions] = useState([]);
+  const [kodeOptions, setKodeOptions] = useState([]);
+  const [indeksCache, setIndeksCache] = useState({}); // { kodeValue: [{value,label}] }
+  const [loadingIndeks, setLoadingIndeks] = useState({}); // { sectionId: boolean }
+  const [isLoadingLists, setIsLoadingLists] = useState(true);
 
-  const kodeOptions = [
-    { value: "PR", label: "PR - Perencanaan" },
-    { value: "OT", label: "OT - Organisasi dan Tata Laksana" },
-    { value: "SA", label: "SA - Sumber Daya Manusia Aparatur" },
-    { value: "KU", label: "KU - Keuangan" },
-    { value: "PB", label: "PB - Penatausahaan BMN" },
-    { value: "HK", label: "HK - Hukum dan Kerjasama" },
-    { value: "UM", label: "UM - Umum" },
-    { value: "PW", label: "PW - Pengawasan" },
-    { value: "TI", label: "TI - Teknologi dan Informasi" },
-    { value: "PK", label: "PK - Pemasyarakatan" },
-  ];
+  /* ── Load bidang & kode on mount ── */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getLists();
+        if (cancelled) return;
 
-  const indeksOptions = [
-    { value: "SA.01.01", label: "SA.01.01 (Inventarisasi Jabatan/Peta Jabatan)" },
-    { value: "SA.01.02", label: "SA.01.02 (Evaluasi Jabatan)" },
-    { value: "SA.01.03", label: "SA.01.03 (Usulan Formasi)" },
-    { value: "SA.01.04", label: "SA.01.04 (Alokasi Formasi)" },
-    { value: "SA.02.01", label: "SA.02.01 (Proses Penerimaan SDM Aparatur)" },
-    { value: "SA.02.02", label: "SA.02.02 (Berkas Lamaran Yang Tidak Diterima)" },
-    { value: "SA.02.03", label: "SA.02.03 (Surat Keputusan CPNS/PNS Kolektif)" },
-    { value: "SA.02.04", label: "SA.02.04 (Penerimaan Pegawai POLTEKIP/AIM)" },
-    { value: "SA.02.05", label: "SA.02.05 (Ujian Dinas dan Ujian Penyesuaian Ijasah)" },
-    { value: "SA.03.01", label: "SA.03.01 (Pengangkatan CPNS)" },
-    { value: "SA.03.02", label: "SA.03.02 (Pengangkatan PNS)" },
-    { value: "SA.03.03", label: "SA.03.03 (Pengangkatan Jabatan Struktural)" },
-    { value: "SA.03.04", label: "SA.03.04 (Pengangkatan Jabatan Fungsional)" },
-    { value: "SA.04.01", label: "SA.04.01 (Alih Tugas/Diperbantukan/Dipekerjakan/Pelaksana)" },
-    { value: "SA.04.02", label: "SA.04.02 (Pelaksana Harian/Pelaksana Tugas)" },
-    { value: "SA.04.03", label: "SA.04.03 (Pencantuman Gelar Akademik)" },
-    { value: "SA.04.04", label: "SA.04.04 (Kenaikan Gaji Berkala)" },
-    { value: "SA.04.05", label: "SA.04.05 (Kenaikan Pangkat/Golongan)" },
-    { value: "SA.04.06", label: "SA.04.06 (Peninjauan Masa Kerja)" },
-    { value: "SA.04.07", label: "SA.04.07 (Berkas Badan Pertimbangan Jabatan dan Pangkat (Baperjakat))" }, 
-    { value: "SA.04.08", label: "SA.04.08 (Pengaktifan Kembali dari CLTN dan Hukuman Disiplin)" },
-    { value: "SA.05.01", label: "SA.05.01 (Penilaian Prestasi Kerja Pegawai (PPKP))" },
-    { value: "SA.05.02", label: "SA.05.02 (Pembinaan Disiplin dan Kode Etik)" },
-    { value: "SA.05.03", label: "SA.05.03 (Pemberian Penghargaan dan Tanda Jasa)" },
-    { value: "SA.06.01", label: "SA.06.01 (Pengembangan Kompetensi Jabatan Pimti dan Administrasi)" },
-    { value: "SA.06.02", label: "SA.06.02 (Pengembangan Kompetensi Fungsional)" },
-    { value: "SA.06.03", label: "SA.06.03 (Pengiriman Peserta Diklat)" },
-    { value: "SA.06.04", label: "SA.06.04 (Beasiswa)" },
-    { value: "SA.07.01", label: "SA.07.01 (Hukuman Disiplin Tingkat Ringan)" },
-    { value: "SA.07.02", label: "SA.07.02 (Hukuman Disiplin Tingkat Sedang)" },
-    { value: "SA.07.03", label: "SA.07.03 (Hukuman Disiplin Tingkat Berat)" },
-    { value: "SA.08.01", label: "SA.08.01 (Data SDM Aparatur)" },
-    { value: "SA.08.02", label: "SA.08.02 (Identitas Pegawai [Karpeg, Karsu, Karis])" },
-    { value: "SA.08.03", label: "SA.08.03 (Izin Kepegawaian [Izin Belajar, Tugas Belajar Dalam dan Luar Negeri])" },
-    { value: "SA.08.04", label: "SA.08.04 (Keanggotaan SDM Aparatur Dalam Organisasi Sosial)" },
-    { value: "SA.08.05", label: "SA.08.05 (Daftar Hadir/Absensi)" },
-    { value: "SA.09.01", label: "SA.09.01 (Kesehatan)" },
-    { value: "SA.09.02", label: "SA.09.02 (Perumahan [TAPERA, Biaya Uang Muka])" },
-    { value: "SA.09.03", label: "SA.09.03 (Taspen)" },
-    { value: "SA.09.04", label: "SA.09.04 (Cuti)" },
-    { value: "SA.09.05", label: "SA.09.05 (Uang Duka Tewas)" },
-    { value: "SA.09.06", label: "SA.09.06 (Pembekalan Purnabhakti)" },
-    { value: "SA.09.07", label: "SA.09.07 (Mutasi Keluarga [Nikah, Cerai, Anak, Kematian])" },
-    { value: "SA.09.08", label: "SA.09.08 (Laporan Kekayaan LP2P dan LHKPN)" },
-    { value: "SA.10.01", label: "SA.10.01 (Pembinaan Jabatan Fungsional Umum)" },
-    { value: "SA.10.02", label: "SA.10.02 (Pembinaan Jabatan Fungsional Tertentu)" },
-    { value: "SA.11.01", label: "SA.11.01 (Pemberhentian Pegawai Atas Permintaan Sendiri)" },
-    { value: "SA.11.02", label: "SA.11.02 (Pemberhentian Karena Batas Usia Pensiun)" },
-    { value: "SA.11.03", label: "SA.11.03 (Pemberhentian Karena Kondisi Jasmani dan/atau Rohani)" },
-    { value: "SA.11.04", label: "SA.11.04 (Pemberhentian Karena Hilang)" },
-    { value: "SA.11.05", label: "SA.11.05 (Pemberhentian Sementara)" },
-    { value: "SA.11.06", label: "SA.11.06 (Pensiun Janda/Duda dan Anak)" },
-    { value: "SA.12", label: "SA.12 (Berkas PNS/ASN)" },
-    { value: "SA.13", label: "SA.13 (Berkas Perseorangan Menteri, Wakil Menteri dan Pejabat Negara Lainnya)" },
-    { value: "SA.14.01", label: "SA.14.01 (Organisasi Non Kedinasan (KORPRI))" },
-    { value: "SA.14.02", label: "SA.14.02 (Organisasi Non Kedinasan (Dharma Wanita))" },
-    { value: "SA.14.03", label: "SA.14.03 (Organisasi Non Kedinasan (Koperasi))" }
-    
-  ];
+        // Parse bidang: string[] → [{value, label}]
+        const bidang = (data.bidang || []).map((b) => ({ value: b, label: b }));
+        setBidangOptions(bidang);
 
-  const handleSearchNip = () => {
-    const trimmedNip = nip.trim();
-
-    if (trimmedNip.length !== 18) {
-      setNama("");
-      toast.error("NIP tidak sesuai, Pastikan NIP terdiri dari 18 digit.");
-      return;
-    }
-
-    if (!/^\d+$/.test(trimmedNip)) {
-      setNama("");
-      toast.error("NIP hanya boleh berisi angka");
-      return;
-    }
-
-    const foundName = userData[trimmedNip];
-
-    if (foundName) {
-      setNama(foundName);
-    } else {
-      setNama("");
-      toast.error("NIP tidak ditemukan, Pastikan NIP benar.");
-    }
-  };
-
-  const handleSubmit = () => {
-    if (!nip.trim()) {
-      toast.error("NIP harus diisi");
-      return;
-    }
-    if (!bidang) {
-      toast.error("Bidang harus dipilih");
-      return;
-    }
-    if (!kodeSurat) {
-      toast.error("Kode Surat harus dipilih");
-      return;
-    }
-    if (!indeksKode) {
-      toast.error("Indeks Kode harus dipilih");
-      return;
-    }
-
-    const confirmed = window.confirm("Apakah Anda yakin ingin mengirim permohonan ini?");
-    if (!confirmed) {
-      return;
-    }
-
-    toast.success("Permohonan berhasil terkirim");
-    handleReset();
-  };
-
-  const handleReset = () => {
-    setNip("");
-    setNama("");
-    setBidang("");
-    setKodeSurat("");
-    setIndeksKode("");
-    setAmbilLebihDariSatu(false);
-    setJumlahNomorSurat(1);
-  };
+        // Parse kode: ["PR (Perencanaan)", ...] → [{value:"PR", label:"PR — Perencanaan"}]
+        const kode = (data.kode || [])
+          .filter((k) => k && k.trim() && !k.startsWith(" (")) // filter empty " ()" entries
+          .map((k) => {
+            const match = k.match(/^([A-Z]+)\s*\((.+)\)$/);
+            if (match) {
+              return { value: match[1], label: `${match[1]} — ${match[2]}` };
+            }
+            return { value: k, label: k };
+          });
+        setKodeOptions(kode);
+      } catch (err) {
+        console.error("Gagal memuat data bidang/kode:", err);
+        toast.error("Gagal memuat data dropdown dari server.");
+      } finally {
+        if (!cancelled) setIsLoadingLists(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const isNipRegistered = Boolean(nama);
-  const checkedAmbilLebihDariSatu = Boolean(ambilLebihDariSatu);
 
+  /* ── NIP search via GAS API ── */
+  const handleSearchNip = async () => {
+    const trimmed = nip.trim();
+    if (!trimmed) { toast.error("Masukkan NIP terlebih dahulu."); return; }
+    if (!/^\d+$/.test(trimmed)) { toast.error("NIP hanya boleh berisi angka."); return; }
+    if (trimmed.length !== 18) { toast.error("NIP harus terdiri dari 18 digit."); return; }
+
+    setIsSearching(true);
+    setNama("");
+
+    try {
+      const result = await getNamaByNIP(trimmed);
+
+      if (isNamaNotFound(result.nama)) {
+        toast.error("NIP tidak ditemukan. Pastikan NIP sudah benar.");
+      } else {
+        setNama(result.nama);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Gagal menghubungi server. Periksa koneksi internet Anda.");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  /* ── Section management ── */
+  const updateSection = (id, field, value) => {
+    setSections((prev) =>
+      prev.map((s) => {
+        if (s.id !== id) return s;
+        if (field === "kodeSurat") return { ...s, kodeSurat: value, indeksKode: "" };
+        return { ...s, [field]: value };
+      })
+    );
+
+    // When kode changes → fetch indeks from API (if not cached)
+    if (field === "kodeSurat" && value) {
+      fetchIndeksForKode(value, id);
+    }
+  };
+
+  const fetchIndeksForKode = async (kode, sectionId) => {
+    // Already cached? Skip
+    if (indeksCache[kode]) return;
+
+    setLoadingIndeks((prev) => ({ ...prev, [sectionId]: true }));
+    try {
+      const result = await getIndeksByKode(kode);
+
+      // New API returns { kode, jumlah_ditemukan, daftar_indeks: string[] }
+      const raw = result.daftar_indeks || result.indeks;
+
+      if (!raw || (typeof raw === "string" && raw.toLowerCase().includes("tidak ditemukan")) || (Array.isArray(raw) && raw.length === 0)) {
+        setIndeksCache((prev) => ({ ...prev, [kode]: [] }));
+      } else {
+        const list = Array.isArray(raw) ? raw : [raw];
+        const options = list
+          .filter((i) => i && i.trim())
+          .map((i) => ({ value: i, label: i }));
+        setIndeksCache((prev) => ({ ...prev, [kode]: options }));
+      }
+    } catch (err) {
+      console.error("Gagal memuat indeks:", err);
+      toast.error(`Gagal memuat indeks untuk kode ${kode}.`);
+      setIndeksCache((prev) => ({ ...prev, [kode]: [] }));
+    } finally {
+      setLoadingIndeks((prev) => ({ ...prev, [sectionId]: false }));
+    }
+  };
+
+  const addSection = () => setSections((prev) => [...prev, createSection()]);
+
+  const removeSection = (id) => {
+    if (sections.length === 1) { toast.error("Minimal harus ada 1 permohonan."); return; }
+    setSections((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  /* ── Validation ── */
+  const handleSubmitClick = () => {
+    if (!nama) { toast.error("Cari dan pilih pemohon terlebih dahulu."); return; }
+    for (let i = 0; i < sections.length; i++) {
+      const s = sections[i];
+      const label = sections.length > 1 ? ` pada Section ${i + 1}` : "";
+      if (!s.bidang) { toast.error(`Bidang harus dipilih${label}.`); return; }
+      if (!s.kodeSurat) { toast.error(`Kode Surat harus dipilih${label}.`); return; }
+      if (!s.indeksKode) { toast.error(`Indeks Kode harus dipilih${label}.`); return; }
+      if (!s.tanggalPermintaan) { toast.error(`Tanggal Permintaan harus diisi${label}.`); return; }
+      if (!s.tanggalSurat) { toast.error(`Tanggal Surat harus diisi${label}.`); return; }
+      if (!s.isiSurat.trim()) { toast.error(`Isi Surat harus diisi${label}.`); return; }
+      if (!s.pengirim.trim()) { toast.error(`Pengirim harus diisi${label}.`); return; }
+      if (!s.tujuan.trim()) { toast.error(`Tujuan harus diisi${label}.`); return; }
+      if (!s.jumlah || s.jumlah < 1) { toast.error(`Jumlah tidak valid${label}.`); return; }
+    }
+    setShowModal(true);
+  };
+
+  /* ── Submit flow: API → PDF → Auto-download ── */
+  const handleConfirmSubmit = async () => {
+    setShowModal(false);
+    setIsSubmitting(true);
+    setPdfResults([]);
+
+    const generatedPdfs = [];
+    let hasError = false;
+
+    for (let i = 0; i < sections.length; i++) {
+      const s = sections[i];
+      const sectionLabel = sections.length > 1 ? ` (Section ${i + 1})` : "";
+
+      // Step 1: Kirim data ke API
+      setLoadingMessage(`Mengirim data permohonan${sectionLabel}…`);
+
+      try {
+        // Mapping field UI → field API
+        const payload = {
+          nip: nip.trim(),
+          nama,
+          bidang: s.bidang,
+          kode: s.kodeSurat,
+          indeks: s.indeksKode,
+          isi_surat: s.isiSurat,
+          pengirim: s.pengirim,
+          tujuan: s.tujuan,
+          jumlah: s.jumlah,
+        };
+
+        const result = await submitPermohonan(payload);
+
+        // Step 2: Generate PDF dari response
+        setLoadingMessage(`Membuat PDF bukti permohonan${sectionLabel}…`);
+
+        const detail = result.detail || result;
+        const { url, filename } = await generatePermohonanPdf(detail);
+
+        generatedPdfs.push({ url, filename });
+
+        // Step 3: Auto-download
+        triggerDownload(url, filename);
+      } catch (err) {
+        console.error(`Gagal submit${sectionLabel}:`, err);
+        toast.error(`Gagal mengirim permohonan${sectionLabel}: ${err.message}`);
+        hasError = true;
+        break;
+      }
+    }
+
+    setIsSubmitting(false);
+
+    if (generatedPdfs.length > 0) {
+      setPdfResults(generatedPdfs);
+      setShowSuccessModal(true);
+    }
+
+    if (!hasError) {
+      handleReset();
+    }
+  };
+
+  const handleCloseSuccessModal = () => {
+    setShowSuccessModal(false);
+    // Cleanup Blob URLs to free memory
+    pdfResults.forEach((pdf) => URL.revokeObjectURL(pdf.url));
+    setPdfResults([]);
+  };
+
+  /* ── Reset ── */
+  const handleReset = () => {
+    setNip(""); setNama("");
+    sectionCounter = 1;
+    setSections([{ id: 1, bidang: "", kodeSurat: "", indeksKode: "", tanggalPermintaan: "", tanggalSurat: "", isiSurat: "", pengirim: "", tujuan: "", jumlah: 1 }]);
+  };
 
   return (
-    <div className="card">
-      <h2>Form Permohonan</h2>
-      <div className="subtitle-2">Silakan isi data di bawah ini.</div>
+    <>
+      {showModal && (
+        <ConfirmModal
+          sections={sections}
+          onConfirm={handleConfirmSubmit}
+          onCancel={() => setShowModal(false)}
+        />
+      )}
 
-        <form className="form" onSubmit={(event) => event.preventDefault()}>
-          {/* Section 1: NIP dan Nama */}
-          <div className="form-section">
-            <div className="form-group">
-              <label>NIP</label>
-              <div className="input-with-button">
-                <input
-                  placeholder="Masukkan NIP"
-                  value={nip}
-                  onChange={(event) => setNip(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      handleSearchNip();
-                    }
-                  }}
-                />
-                <button type="button" className="btn-search" onClick={handleSearchNip}>
-                  <FontAwesomeIcon icon={faMagnifyingGlass}  />
+      {isSubmitting && <LoadingModal message={loadingMessage} />}
+
+      {showSuccessModal && (
+        <SuccessModal
+          pdfResults={pdfResults}
+          onClose={handleCloseSuccessModal}
+        />
+      )}
+
+      <div className="form-main-card">
+        <div className="form-main-card-title">Form Permohonan Nomor Surat</div>
+        <div className="form-main-card-subtitle">
+          Isi data di bawah ini untuk mengajukan permohonan nomor surat resmi.
+        </div>
+
+        {/* ── APPLICANT SECTION ── */}
+        <div className="applicant-section">
+          <div className="field-label">
+            NIP<span className="required">*</span>
+          </div>
+          <div className="nip-search-wrapper">
+            <input
+              className="nip-input"
+              placeholder="Masukkan NIP…"
+              value={nip}
+              onChange={(e) => setNip(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !isSearching && handleSearchNip()}
+              maxLength={18}
+              disabled={isSearching}
+            />
+            <button
+              className="nip-search-btn"
+              type="button"
+              onClick={handleSearchNip}
+              disabled={isSearching}
+              style={{ opacity: isSearching ? 0.7 : 1 }}
+            >
+              <FontAwesomeIcon
+                icon={isSearching ? faSpinner : faMagnifyingGlass}
+                spin={isSearching}
+              />
+              {isSearching ? "Mencari…" : "Cari"}
+            </button>
+          </div>
+
+          {nama && (
+            <div className="nama-display">
+              <div className="nama-display-icon">
+                <FontAwesomeIcon icon={faUser} />
+              </div>
+              <div className="nama-display-info">
+                <span className="nama-display-label">Nama Pegawai</span>
+                <span className="nama-display-value">{nama}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── SECTIONS ── */}
+        {isNipRegistered && (
+          <>
+            {sections.map((section, index) => (
+              <div className="section-card" key={section.id}>
+                <div className="section-header">
+                  <div className="section-title-group">
+                    {/* <div className="section-badge">{index + 1}</div> */}
+                    {/* <div className="section-title-text">Section {index + 1}</div> */}
+                  </div>
+                  {sections.length > 1 && (
+                    <button className="btn-hapus" type="button" onClick={() => removeSection(section.id)}>
+                      <FontAwesomeIcon icon={faTrash} size="xs" />
+                      HAPUS
+                    </button>
+                  )}
+                </div>
+
+                {/* Row 1: Bidang | Kode Surat */}
+                <div className="form-grid-2">
+                  <div className="form-field">
+                    <div className="field-label">Bidang <span className="required">*</span></div>
+                    <select
+                      className="form-select"
+                      value={section.bidang}
+                      onChange={(e) => updateSection(section.id, "bidang", e.target.value)}
+                    >
+                      <option value="" disabled>Pilih Bidang</option>
+                      {bidangOptions.map((o, i) => <option key={`${o.value}-${i}`} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="form-field">
+                    <div className="field-label">Kode Surat <span className="required">*</span></div>
+                    <select
+                      className="form-select"
+                      value={section.kodeSurat}
+                      onChange={(e) => updateSection(section.id, "kodeSurat", e.target.value)}
+                    >
+                      <option value="" disabled>Pilih Kode</option>
+                      {kodeOptions.map((o, i) => <option key={`${o.value}-${i}`} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row 1b: Indeks Kode — full width */}
+                <div className="form-grid-1">
+                  <div className="form-field">
+                    <div className="field-label">Indeks Kode <span className="required">*</span></div>
+                    <SearchableDropdown
+                      options={section.kodeSurat ? (indeksCache[section.kodeSurat] ?? []) : []}
+                      value={section.indeksKode}
+                      onChange={(val) => updateSection(section.id, "indeksKode", val)}
+                      placeholder={
+                        loadingIndeks[section.id]
+                          ? "Memuat indeks…"
+                          : section.kodeSurat
+                            ? "Pilih Indeks Kode…"
+                            : "Pilih Kode Surat dahulu"
+                      }
+                      disabled={!section.kodeSurat || loadingIndeks[section.id]}
+                    />
+                  </div>
+                </div>
+
+                {/* Row 2: Tanggal Permintaan | Tanggal Surat */}
+                <div className="form-grid-2">
+                  <div className="form-field">
+                    <div className="field-label">Tanggal Permintaan <span className="required">*</span></div>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={section.tanggalPermintaan}
+                      onChange={(e) => updateSection(section.id, "tanggalPermintaan", e.target.value)}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <div className="field-label">Tanggal Surat <span className="required">*</span></div>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={section.tanggalSurat}
+                      onChange={(e) => updateSection(section.id, "tanggalSurat", e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Row 3: Isi Surat */}
+                <div className="form-grid-1">
+                  <div className="form-field">
+                    <div className="field-label">Isi Surat<span className="required">*</span></div>
+                    <textarea
+                      className="form-textarea"
+                      placeholder="Deskripsikan isi/perihal surat…"
+                      value={section.isiSurat}
+                      onChange={(e) => updateSection(section.id, "isiSurat", e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Row 4: Pengirim | Tujuan | Jumlah */}
+                <div className="form-grid-3">
+                  <div className="form-field">
+                    <div className="field-label">Pengirim<span className="required">*</span></div>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Nama pengirim…"
+                      value={section.pengirim}
+                      onChange={(e) => updateSection(section.id, "pengirim", e.target.value)}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <div className="field-label">Tujuan<span className="required">*</span></div>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Instansi/pihak tujuan…"
+                      value={section.tujuan}
+                      onChange={(e) => updateSection(section.id, "tujuan", e.target.value)}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <div className="field-label">Jumlah<span className="required">*</span></div>
+                    <input
+                      type="number"
+                      className="form-input"
+                      min="1"
+                      max="20"
+                      value={section.jumlah}
+                      onChange={(e) => updateSection(section.id, "jumlah", Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* ── BOTTOM ACTIONS ── */}
+            <div className="form-bottom-actions">
+              <button className="btn-add-section" type="button" onClick={addSection}>
+                <FontAwesomeIcon icon={faPlus} />
+                Ambil Nomor Surat Lain
+              </button>
+              <div className="form-actions-right">
+                <button className="btn-reset-form" type="button" onClick={handleReset}>
+                  <FontAwesomeIcon icon={faRotateLeft} />
+                  &nbsp;Reset
+                </button>
+                <button className="btn-submit-main" type="button" onClick={handleSubmitClick} disabled={isSubmitting}>
+                  <FontAwesomeIcon icon={faPaperPlane} />
+                  Submit
                 </button>
               </div>
             </div>
-
-          <div className="form-group">
-            <label>Nama</label>
-            <input value={nama} disabled />
-          </div>
-        </div>
-
-        {isNipRegistered && (
-          <>
-            {/* Section 2: Field sisanya */}
-            <div className="form-section">
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label>Bidang</label>
-                  <select value={bidang} onChange={(event) => setBidang(event.target.value)}>
-                    <option value="" disabled>
-                      Pilih Bidang
-                    </option>
-                    {bidangOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Kode Surat</label>
-                  <select value={kodeSurat} onChange={(event) => setKodeSurat(event.target.value)}>
-                    <option value="" disabled>
-                      Pilih Kode
-                    </option>
-                    {kodeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Section 3: Dropdown pilih indeks kode */}
-            <div className="form-section">
-              <div className="form-group">
-                <label>Indeks Kode</label>
-                <SearchableDropdown
-                  options={indeksOptions}
-                  value={indeksKode}
-                  onChange={(value) => setIndeksKode(value)}
-                  placeholder="Pilih Indeks Kode"
-                />
-              </div>
-
-              <div className="form-row-2">
-                <div className="input-checkbox">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={ambilLebihDariSatu}
-                      onChange={(event) => setAmbilLebihDariSatu(event.target.checked)}
-                    />
-                    Ambil lebih dari 1 nomor
-                  </label>
-                </div>
-
-                <div className="form-group" style={{ visibility: ambilLebihDariSatu ? 'visible' : 'hidden', opacity: ambilLebihDariSatu ? 1 : 0.5 }}>
-                  <label>Jumlah Nomor Surat</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={jumlahNomorSurat}
-                    disabled={!ambilLebihDariSatu}
-                    onChange={(event) => setJumlahNomorSurat(Number(event.target.value))}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="form-actions">
-              <button type="button" className="btn-secondary" onClick={handleReset}>
-                Hapus
-              </button>
-              <button type="button" className="btn-submit" onClick={handleSubmit}>
-                Kirim
-              </button>
-            </div>
           </>
         )}
-      </form>
-    </div>
+      </div>
+    </>
   );
 }
