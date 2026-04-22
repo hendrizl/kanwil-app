@@ -2,7 +2,7 @@
  * Konfigurasi API — Google Apps Script Web App
  */
 const GAS_BASE_URL =
-  "https://script.google.com/macros/s/AKfycbx8PNTSHlye5FN1Uxkof5nMNiD8QXGMrQnVchLV0Ko/dev";
+  "https://script.google.com/macros/s/AKfycbys8i_Ks8SuJBSh6BdQTNL91QQptxqWQ8WNOqE_tcW-HTC0PAU3HjS2nCINtJxTYqsP/exec";
 
 /**
  * Cari nama pegawai berdasarkan NIP.
