@@ -29,7 +29,7 @@ function App() {
         {tab === "riwayat" && <Riwayat />}
       </div>
 
-      {/* <Footer /> */}
+      <Footer />
     </>
   );
 }

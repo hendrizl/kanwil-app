@@ -2,7 +2,7 @@
  * Konfigurasi API — Google Apps Script Web App
  */
 const GAS_BASE_URL =
-  "https://script.google.com/macros/s/AKfycby9bgL4H88ZhkWpGIsQUxbsC8kNWsAdh0hGF_Ob5ac9fQqHiFYg3mXVn0YCgJY72RLZ/exec";
+  "https://script.google.com/macros/s/AKfycbys8i_Ks8SuJBSh6BdQTNL91QQptxqWQ8WNOqE_tcW-HTC0PAU3HjS2nCINtJxTYqsP/exec";
 
 /**
  * Cari nama pegawai berdasarkan NIP.
@@ -54,7 +54,7 @@ export async function getPermohonanByNIP(nip) {
  * Endpoint khusus untuk submit permohonan (berbeda dari GAS_BASE_URL).
  */
 const GAS_SUBMIT_URL =
-  "https://script.google.com/macros/s/AKfycbwtYq807NiAfelOjl6KCZ6e_Y1EgR-r48TizksHLjLsg7DQ6ZdButbMRA5WXHxF-rc_/exec";
+  "https://script.google.com/macros/s/AKfycbys8i_Ks8SuJBSh6BdQTNL91QQptxqWQ8WNOqE_tcW-HTC0PAU3HjS2nCINtJxTYqsP/exec";
 
 /**
  * Kirim permohonan nomor surat ke spreadsheet.
