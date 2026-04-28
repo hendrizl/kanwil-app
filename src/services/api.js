@@ -2,7 +2,7 @@
  * Konfigurasi API — Google Apps Script Web App
  */
 const GAS_BASE_URL =
-  "https://script.google.com/macros/s/AKfycbys8i_Ks8SuJBSh6BdQTNL91QQptxqWQ8WNOqE_tcW-HTC0PAU3HjS2nCINtJxTYqsP/exec";
+  "https://script.google.com/macros/s/AKfycby0p4FlOAEsHNu3YbQlp-Jm-aCvjxJGHAEJgvNkLhMrJd_MdrFveD3gyUOrdjYvy8zD/exec";
 
 /**
  * Cari nama pegawai berdasarkan NIP.
@@ -51,12 +51,6 @@ export async function getPermohonanByNIP(nip) {
 }
 
 /**
- * Endpoint khusus untuk submit permohonan (berbeda dari GAS_BASE_URL).
- */
-const GAS_SUBMIT_URL =
-  "https://script.google.com/macros/s/AKfycbys8i_Ks8SuJBSh6BdQTNL91QQptxqWQ8WNOqE_tcW-HTC0PAU3HjS2nCINtJxTYqsP/exec";
-
-/**
  * Kirim permohonan nomor surat ke spreadsheet.
  * @param {object} data — { nip, nama, bidang, kode, indeks, isi_surat, pengirim, tujuan, jumlah }
  * @returns {{ code, success, message, detail }}
@@ -64,8 +58,7 @@ const GAS_SUBMIT_URL =
 export async function submitPermohonan(data) {
   const body = JSON.stringify({ action: "tambahPermohonan", data });
 
-  // GAS tidak support CORS preflight, pakai text/plain agar tidak ada OPTIONS request
-  const response = await fetch(GAS_SUBMIT_URL, {
+  const response = await fetch(GAS_BASE_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain" },
     body,

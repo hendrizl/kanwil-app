@@ -1,7 +1,5 @@
-import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faBuildingColumns,
   faCode,
   faDatabase,
   faFileLines,
@@ -11,10 +9,11 @@ import {
   faHeadset,
   faXmark
 } from "@fortawesome/free-solid-svg-icons";
-import logo from "../assets/logo_pas_outline.png";
-import about from "../assets/ic_about.png"; // <- logo kanan
+import logo from "../../assets/logo_pas_outline.png";
 
-function AboutModal({ onClose }) {
+const whatsappAdmin = "https://api.whatsapp.com/send?phone=6289668652403&text=*%23LAPORAN%20ERROR%20SISTEM%20PERMOHONAN%20NOMOR%20SURAT*%0A%0AKode%20Surat%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%3A%20(SA.03.04)%0AIsi%20Ringkasan%20Surat%20%20%20%20%3A%20(Surat%20Keterangan......)%0AJumlah%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%3A%20(5)";
+
+export default function AboutModal({ onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box about-modal-box" onClick={(e) => e.stopPropagation()}>
@@ -39,7 +38,7 @@ function AboutModal({ onClose }) {
               <div className="about-grid-label">
                 <FontAwesomeIcon icon={faCode} /> Developer
               </div>
-              <div className="about-grid-value">Tim Humas dan TI</div>
+              <div className="about-grid-value">Pranata Komputer Kanwil Ditjenpas Kaltim</div>
             </div>
             <div className="about-grid-item about-grid-item-2">
               <div className="about-grid-label">
@@ -77,8 +76,11 @@ function AboutModal({ onClose }) {
             <button className="about-btn about-btn-outline">
               <FontAwesomeIcon icon={faBook} /> User Guide
             </button>
-            <button className="about-btn about-btn-primary">
-              <FontAwesomeIcon icon={faHeadset} /> Contact Admin IT
+            <button
+              className="about-btn about-btn-primary"
+              onClick={() => window.open(whatsappAdmin)}>
+              <FontAwesomeIcon icon={faHeadset} />
+              Contact Admin IT
             </button>
           </div>
 
@@ -88,45 +90,5 @@ function AboutModal({ onClose }) {
         </div>
       </div>
     </div >
-  );
-}
-
-export default function Header() {
-  const [showAbout, setShowAbout] = useState(false);
-
-  return (
-    <header className="header">
-      {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
-
-      <div className="header-inner">
-        <div className="header-box">
-
-          {/* KIRI */}
-          <div className="header-left">
-            <img src={logo} className="header-logo" />
-
-            <div className="header-text">
-              <div className="brand">
-                Kantor Wilayah Direktorat Jenderal Pemasyarakatan
-              </div>
-              <div className="brand-2">Kalimantan Timur</div>
-
-            </div>
-          </div>
-
-          {/* KANAN */}
-          <img
-            src={about}
-            className="header-logo-right"
-            onClick={() => setShowAbout(true)}
-            style={{ cursor: "pointer", transition: "transform 0.2s" }}
-            onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.1)"}
-            onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
-            title="Tentang Aplikasi"
-          />
-
-        </div>
-      </div>
-    </header>
   );
 }

@@ -28,6 +28,13 @@ export default function SearchableDropdown({
   }, []);
 
   useEffect(() => {
+    if (!open) {
+      if (selectedOption) setQuery(selectedOption.label);
+      else setQuery("");
+    }
+  }, [open, selectedOption]);
+
+  useEffect(() => {
     if (selectedOption) setQuery(selectedOption.label);
     else setQuery("");
   }, [value, selectedOption]);

@@ -13,8 +13,12 @@ function loadImageAsBase64(url) {
       canvas.width = img.width;
       canvas.height = img.height;
       const ctx = canvas.getContext("2d");
+      // Fill canvas with white background before drawing (in case PNG is transparent)
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
-      resolve(canvas.toDataURL("image/png"));
+      // Export as compressed JPEG to drastically reduce file size
+      resolve(canvas.toDataURL("image/jpeg", 0.75));
     };
     img.onerror = reject;
     img.src = url;
@@ -51,6 +55,7 @@ export async function generatePermohonanPdf(detail) {
     orientation: "portrait",
     unit: "mm",
     format: "a4",
+    compress: true, // Mengaktifkan kompresi stream bawaan jsPDF
   });
 
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -58,10 +63,10 @@ export async function generatePermohonanPdf(detail) {
 
   // ─── LOGOS ───
   const logoSize = 28;
-  const logoGap = 10;
+  const logoGap = 2;
   const logoY = 14;
-  doc.addImage(logoLeft, "PNG", centerX - logoGap - logoSize, logoY, logoSize, logoSize);
-  doc.addImage(logoRight, "PNG", centerX + logoGap, logoY, logoSize, logoSize);
+  doc.addImage(logoLeft, "JPEG", centerX - logoGap - logoSize, logoY, logoSize, logoSize, undefined, "FAST");
+  doc.addImage(logoRight, "JPEG", centerX + logoGap, logoY, logoSize, logoSize, undefined, "FAST");
 
   // ─── TITLE ───
   const titleY = logoY + logoSize + 12;
@@ -70,19 +75,13 @@ export async function generatePermohonanPdf(detail) {
   doc.text("KANTOR WILAYAH DIREKTORAT JENDERAL PEMASYARAKATAN", centerX, titleY, { align: "center" });
   doc.text("KALIMANTAN TIMUR", centerX, titleY + 7, { align: "center" });
 
-  // ─── DIVIDER ───
-  const dividerY = titleY + 14;
-  doc.setDrawColor(3, 34, 60);
-  doc.setLineWidth(0.6);
-  doc.line(30, dividerY, pageWidth - 30, dividerY);
-
   // ─── TOTAL PERMOHONAN ───
   const infoY = dividerY + 10;
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
   doc.text("Total Permohonan : ", pageWidth - 40, infoY, { align: "right" });
   doc.setFont("helvetica", "bold");
-  doc.text(`${jumlah_dibuat} nomor surat`, pageWidth - 40, infoY);
+  doc.text(`${jumlah_dibuat}`, pageWidth - 40, infoY);
 
   // ─── TABLE ───
   // Build rows: nomor urut, kode, nomor surat ("Indeks"-xxxx), keterangan
@@ -104,7 +103,7 @@ export async function generatePermohonanPdf(detail) {
     head: [["No.", "Kode", "Nomor Surat", "Keterangan"]],
     body: rows,
     theme: "grid",
-    margin: { left: 30, right: 30 },
+    margin: { left: 10, right: 10 },
     styles: {
       font: "helvetica",
       fontSize: 10,
@@ -122,7 +121,7 @@ export async function generatePermohonanPdf(detail) {
     },
     columnStyles: {
       0: { halign: "center", cellWidth: 14 },
-      1: { halign: "center", cellWidth: 48 },
+      1: { halign: "center", cellWidth: 56 },
       2: { halign: "center", cellWidth: 22 },
       3: { halign: "left" },
     },
@@ -137,11 +136,11 @@ export async function generatePermohonanPdf(detail) {
   doc.setFontSize(11);
   doc.text("Nama Pemohon : ", 30, finalY);
   doc.setFont("helvetica", "bold");
-  doc.text(`"${nama_pemohon}"`, 73, finalY);
+  doc.text(`${nama_pemohon}`, 73, finalY);
 
   // ─── GENERATE BLOB URL ───
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const filename = `Permohonan_${kode}_${nama_pemohon.replace(/\s+/g, "_")}_${dateStr}.pdf`;
+  const filename = `Nomor Surat_${kode}_${keterangan}_${dateStr}.pdf`;
 
   const blob = doc.output("blob");
   const url = URL.createObjectURL(blob);

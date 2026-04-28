@@ -1,8 +1,8 @@
-import Header from "./components/Header";
-import Footer from "./components/Footer";
-import Tabs from "./components/Tabs";
-import Home from "./pages/Home";
-import Riwayat from "./pages/Riwayat";
+import Header from "./components/common/Header";
+import Footer from "./components/common/Footer";
+import Tabs from "./components/common/Tabs";
+import Home from "./pages/Home/index";
+import Riwayat from "./pages/Riwayat/index";
 import { useState } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
