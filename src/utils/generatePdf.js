@@ -31,7 +31,7 @@ function loadImageAsBase64(url) {
  * sekaligus disimpan untuk tombol fallback download di UI.
  *
  * @param {object} detail — response detail dari GAS
- *   { nama_pemohon, kode, indeks, jumlah_dibuat, firs_number, last_number, keterangan }
+ *   { nama_pemohon, kode, indeks, jumlah_dibuat, first_number, last_number, keterangan }
  * @returns {{ url: string, filename: string }}
  */
 export async function generatePermohonanPdf(detail) {
@@ -40,7 +40,7 @@ export async function generatePermohonanPdf(detail) {
     kode,
     indeks,
     jumlah_dibuat,
-    firs_number,
+    first_number,
     last_number,
     keterangan,
   } = detail;
@@ -76,7 +76,7 @@ export async function generatePermohonanPdf(detail) {
   doc.text("KALIMANTAN TIMUR", centerX, titleY + 7, { align: "center" });
 
   // ─── TOTAL PERMOHONAN ───
-  const infoY = dividerY + 10;
+  const infoY = titleY + 20;
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
   doc.text("Total Permohonan : ", pageWidth - 40, infoY, { align: "right" });
@@ -85,7 +85,7 @@ export async function generatePermohonanPdf(detail) {
 
   // ─── TABLE ───
   // Build rows: nomor urut, kode, nomor surat ("Indeks"-xxxx), keterangan
-  const firstNum = parseInt(firs_number, 10);
+  const firstNum = parseInt(first_number, 10);
   const rows = [];
   for (let i = 0; i < jumlah_dibuat; i++) {
     rows.push([
