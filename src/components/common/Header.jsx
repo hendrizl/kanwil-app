@@ -14,16 +14,13 @@ export default function Header() {
         <div className="header-box">
 
           {/* KIRI */}
-          <div className="header-left">
-            <img src={logo} className="header-logo" />
+          <img src={logo} className="header-logo" />
 
-            <div className="header-text">
-              <div className="brand">
-                Kantor Wilayah Direktorat Jenderal Pemasyarakatan
-              </div>
-              <div className="brand-2">Kalimantan Timur</div>
-
+          <div className="header-text">
+            <div className="brand">
+              Kantor Wilayah Direktorat Jenderal Pemasyarakatan
             </div>
+            <div className="brand-2">Kalimantan Timur</div>
           </div>
 
           {/* KANAN */}
